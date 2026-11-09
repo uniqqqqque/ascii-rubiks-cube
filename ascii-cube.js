@@ -10,8 +10,8 @@
 
    There is no lighting. Each face of the cube has its own
    character, and a sticker carries that character wherever the
-   turns take it: the dotted face is dots on whichever side it
-   ends up, so the eye can follow the pieces rather than watch the
+   turns take it: the "#" face is "#" on whichever side it ends
+   up, so the eye can follow the pieces rather than watch the
    shading change.
 
    Each of the 26 visible cubies is a block of "black plastic"
@@ -42,9 +42,10 @@
   "use strict";
 
   const DIST = 11; /* camera distance, in cubie widths */
-  /* one character per face, faces 0..5 = +x -x +y -y +z -z: dots
-     on the right at the start, "$" on top, ";" on the left */
-  const GLYPHS = ".#$=*;";
+  /* one character per face, faces 0..5 = +x -x +y -y +z -z: at
+     the start "#" is on the right (the accent face), "$" on top
+     and ";" on the left */
+  const GLYPHS = "#.$=*;";
 
   /* quarter turn 420ms, eased in and out so it starts and lands
      softly; a beat between moves, a longer one when it is
@@ -94,7 +95,7 @@
        accentFace  which face is coloured, 0..5 = +x -x +y -y +z -z
                    (default 0, the side on the right at the start)
        glyphs      six characters, one per face in that order
-                   (default ".#$=*;")
+                   (default "#.$=*;")
      returns { cols, rows, frame(nowMs), resize(cols, aspect) };
      frame() moves the animation on to `nowMs` and returns
      { chars, tone, cols, rows }: chars is one string per cell,
