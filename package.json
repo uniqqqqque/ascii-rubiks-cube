@@ -1,0 +1,22 @@
+{
+  "name": "ascii-rubiks-cube",
+  "version": "1.0.0",
+  "description": "A Rubik's cube drawn in ASCII that scrambles and solves itself, in the browser or in a terminal. One file, no dependencies.",
+  "main": "ascii-cube.js",
+  "bin": {
+    "ascii-rubiks-cube": "cli.js"
+  },
+  "files": [
+    "ascii-cube.js",
+    "cli.js"
+  ],
+  "scripts": {
+    "start": "node cli.js"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "keywords": ["ascii", "rubiks-cube", "animation", "terminal", "3d"],
+  "author": "Deniss Poliščuks",
+  "license": "MIT"
+}
