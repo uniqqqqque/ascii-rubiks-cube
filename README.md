@@ -65,12 +65,16 @@ node cli.js
 Press `q` or `Ctrl+C` to quit. The cube fills as much of the window as it can.
 If you resize the window, it adjusts.
 
+For a high-refresh screen, `node cli.js --fps 165` (or 144, 120…). If a frame is
+late (a very wide window, or a terminal that can't draw that fast), frames are
+dropped rather than queued, so the cube still turns at the right speed.
+
 Options:
 
 | Option | What it does | Default |
 | --- | --- | --- |
 | `--moves N` | quarter turns in each scramble | 8 |
-| `--fps N` | frames per second | 30 |
+| `--fps N` | frames per second, up to your screen's refresh rate (60, 144, 165…); also `--fps=165` or `--fps165` | 30 |
 | `--no-color` | no colour (also when `NO_COLOR` is set) | colour on |
 
 When the output is not a terminal (`node cli.js > cube.txt`), it prints one
@@ -87,7 +91,7 @@ still frame and exits.
 or load it from jsDelivr:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/uniqqqqque/ascii-rubiks-cube@1.1.0/ascii-cube.js" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/uniqqqqque/ascii-rubiks-cube@1.2.0/ascii-cube.js" defer></script>
 ```
 
 **2. Put an element where the cube should be:**

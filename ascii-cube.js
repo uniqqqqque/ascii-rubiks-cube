@@ -114,24 +114,30 @@
        grid 72 wide it spins without touching the sides; everything
        scales from that. The point spacing on a face stays under
        half a cell, so a face never shows holes. */
-    let COLS, ROWS, ASPECT, SCALE, STEP, BODY, STICKER, RING, zbuf, chars, tone;
+    let COLS, ROWS, HALF_C, HALF_R, ASPECT, SCALE, STEP, BODY, STICKER, RING, zbuf, chars, tone;
 
     /* point offsets across one face, in the face's own (u, v).
        Counted, not stepped: adding STEP up from -half drifts and
        stops one step short of +half, which leaves a sliver between
        two cubies that shows as the odd empty cell. */
-    const grid = (half) => {
+    const grid = (half, keep) => {
       const n = Math.ceil((2 * half) / STEP);
       const pts = [];
       for (let i = 0; i <= n; i++)
-        for (let j = 0; j <= n; j++) pts.push([-half + (2 * half * i) / n, -half + (2 * half * j) / n]);
-      return pts;
+        for (let j = 0; j <= n; j++) {
+          const u = -half + (2 * half * i) / n, v = -half + (2 * half * j) / n;
+          if (!keep || keep(u, v)) pts.push(u, v);
+        }
+      /* flat u, v, u, v, ... */
+      return new Float64Array(pts);
     };
 
     function resize(cols, aspect) {
       COLS = Math.max(16, Math.round(cols));
       ASPECT = aspect ?? ASPECT ?? 0.6 / 1.1;
       ROWS = Math.max(8, Math.round(COLS * (44 / 72) * (ASPECT / (0.6 / 1.1))));
+      HALF_C = COLS / 2;
+      HALF_R = ROWS / 2;
       const perUnit = (COLS / 72) * 14.8;
       SCALE = perUnit * DIST;
       STEP = Math.min(0.03, 0.45 / perUnit);
@@ -143,7 +149,7 @@
          from the sticker point beside it, and the sticker comes out
          full of holes. So an outer face draws only the ring of
          plastic around its sticker. */
-      RING = BODY.filter(([u, v]) => Math.max(Math.abs(u), Math.abs(v)) > 0.44 + 1e-9);
+      RING = grid(0.5, (u, v) => Math.max(Math.abs(u), Math.abs(v)) > 0.44 + 1e-9);
       zbuf = new Float32Array(COLS * ROWS);
       chars = new Array(COLS * ROWS);
       tone = new Uint8Array(COLS * ROWS);
@@ -233,13 +239,23 @@
             const tint = sticker && sticker.face === ACCENT ? 1 : 0;
             const ch = sticker ? GLYPH[sticker.face] : " ";
 
+            /* every point of a face is the face's centre plus u and
+               v along its two edges, so after the turn it is still
+               o + u·du + v·dv: three vectors per face, then a few
+               multiplies per point, no arrays made per point */
+            const a1 = (a + 1) % 3, a2 = (a + 2) % 3;
+            const ux = A[a1], uy = A[3 + a1], uz = A[6 + a1];
+            const vx = A[a2], vy = A[3 + a2], vz = A[6 + a2];
             const plot = (pts, depth, glyph, t) => {
-              for (const [u, v] of pts) {
-                const p = apply(A, facePoint(a, s, depth, u, v));
-                const z = p[2] + b[2] + DIST;
+              const ox = s * depth * A[a] + b[0];
+              const oy = s * depth * A[3 + a] + b[1];
+              const oz = s * depth * A[6 + a] + b[2] + DIST;
+              for (let q = 0; q < pts.length; q += 2) {
+                const u = pts[q], v = pts[q + 1];
+                const z = oz + u * uz + v * vz;
                 const k = SCALE / z;
-                const col = Math.round(COLS / 2 + (p[0] + b[0]) * k);
-                const row = Math.round(ROWS / 2 - (p[1] + b[1]) * k * ASPECT);
+                const col = Math.round(HALF_C + (ox + u * ux + v * vx) * k);
+                const row = Math.round(HALF_R - (oy + u * uy + v * vy) * k * ASPECT);
                 if (col < 0 || col >= COLS || row < 0 || row >= ROWS) continue;
                 const i = row * COLS + col;
                 if (z < zbuf[i]) { zbuf[i] = z; chars[i] = glyph; tone[i] = t; }

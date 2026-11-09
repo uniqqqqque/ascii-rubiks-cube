@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 /* ══ the cube in a terminal ════════════════════════════════
    node cli.js [--moves N] [--fps N] [--no-color]
+   (also written --fps=N or --fps165)
 
-   Fills as much of the terminal as the cube needs, about 30
-   frames a second. The accent face is orange (truecolor, or the
+   Fills as much of the terminal as the cube needs, 30 frames a
+   second unless --fps says otherwise; a high-refresh screen can
+   take --fps 144 or --fps 165. If a frame is not ready in time
+   (a very wide window, or a terminal that cannot draw that
+   fast), frames are dropped rather than queued, so the motion
+   keeps real time. The accent face is orange (truecolor, or the
    nearest of the 256 colours where the terminal has no
    truecolor). Ctrl+C or q stops it and gives the screen back.
 
@@ -15,14 +20,24 @@ const { createCube } = require("./ascii-cube.js");
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
+/* --fps 165, --fps=165 and --fps165 all mean the same */
 const value = (name, fallback) => {
-  const i = args.indexOf(name);
-  const n = i >= 0 ? Number(args[i + 1]) : NaN;
+  let raw;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === name) raw = args[i + 1];
+    else if (a.startsWith(name)) raw = a.slice(name.length).replace(/^=/, "");
+  }
+  const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
 if (flag("--help") || flag("-h")) {
-  console.log("usage: node cli.js [--moves N] [--fps N] [--no-color]");
+  console.log("usage: node cli.js [--moves N] [--fps N] [--no-color]\n" +
+    "  --moves N   quarter turns in each scramble (default 8)\n" +
+    "  --fps N     frames per second, e.g. 60, 144, 165 (default 30)\n" +
+    "  --no-color  no colour\n" +
+    "  q or Ctrl+C to quit");
   process.exit(0);
 }
 
@@ -75,7 +90,7 @@ if (!tty) {
 out.write("\x1b[?1049h\x1b[?25l\x1b[2J");
 let timer = null;
 const restore = () => {
-  clearInterval(timer);
+  clearTimeout(timer);
   out.write(RESET + "\x1b[?25h\x1b[?1049l");
 };
 const quit = () => { restore(); process.exit(0); };
@@ -96,12 +111,35 @@ out.on("resize", () => {
   out.write("\x1b[2J");
 });
 
-const t0 = Date.now();
-timer = setInterval(() => {
-  const f = cube.frame(Date.now() - t0);
+/* ── the clock ─────────────────────────────────────────────
+   Each frame is scheduled for its own moment rather than with a
+   fixed setInterval, which at 165 fps (6ms) would pile frames up
+   whenever one ran long. Running late, it skips to the next due
+   moment instead of catching up; and while the terminal is still
+   swallowing the last frame, it waits for it rather than burying
+   it under more. */
+const { performance } = require("perf_hooks");
+const FPS = Math.min(1000, value("--fps", 30));
+const PERIOD = 1000 / FPS;
+const t0 = performance.now();
+let due = t0;
+
+const draw = () => {
+  const f = cube.frame(performance.now() - t0);
   /* centre the grid in the window, then draw it from the top */
   const padTop = Math.max(0, Math.floor(((out.rows || 24) - f.rows) / 2));
   const padLeft = " ".repeat(Math.max(0, Math.floor(((out.columns || 80) - f.cols) / 2)));
   const lines = render(f).map((l) => padLeft + l + "\x1b[K");
-  out.write("\x1b[H" + "\x1b[K\n".repeat(padTop) + lines.join("\n") + "\x1b[J");
-}, 1000 / value("--fps", 30));
+  return out.write("\x1b[H" + "\x1b[K\n".repeat(padTop) + lines.join("\n") + "\x1b[J");
+};
+
+const loop = () => {
+  const flushed = draw();
+  const now = performance.now();
+  due += PERIOD;
+  if (due < now) due = now + PERIOD - ((now - t0) % PERIOD);
+  const next = () => { timer = setTimeout(loop, Math.max(0, due - performance.now())); };
+  if (flushed) next();
+  else out.once("drain", next);
+};
+loop();
